@@ -12,7 +12,7 @@ AddicoreRFID myRFID;
 const int chipSelectPin = 10;
 const int NRSTPD = 5;
 #define MAX_LEN 16
-Adafruit_NeoPixel strip = Adafruit_NeoPixel(20, PIN, NEO_GRB + NEO_KHZ800);
+Adafruit_NeoPixel strip = Adafruit_NeoPixel(300, PIN, NEO_GRB + NEO_KHZ800);
 void setup() {
   Serial.begin(9600);
   SPI.begin();
@@ -41,31 +41,20 @@ void loop()
     uint tagType = str[0] << 8;
   }
 
-  status = myRFID.AddicoreRFID_Anticoll(str);
-  if (status == MI_OK)
-  {
-    checksum1 = str[0] ^ str[1] ^ str[2] ^ str[3];
-    Serial.println(str[4]);
-    currTag = str[4];
-    if (str[0] == 197)                   
-    {
-      Serial.println("\nHello Craig!\n");
-    } else if (str[0] == 244) { 
-      Serial.println("\nHello Erin!\n");
-    }
-    Serial.println();
-    //delay(1000);
-  }
-
   myRFID.AddicoreRFID_Halt();	
-  if (int(currTag) == 233) {
-    colorWipe(strip.Color(255, 0, 0), 5); // Red
-  }
+  if (int(currTag) == 233) { // If the tag is this
+    //colorWipe(strip.Color(255, 0, 0), 5); // Red
+
+    // There are 300 LEDs, starting at 0
+    setSection(0, 200, 255, 0, 0); // Set 0 to 200 RED
+    setSection(201, 299,0, 255, 0); // Set the rest GREEN
+    
+  } // End each student code
   if (int(currTag) == 234) {
-    colorWipe(strip.Color(0, 255, 0), 0); // Green
+    //colorWipe(strip.Color(0, 255, 0), 0); // Green
   }
   if (int(currTag) == 246) {
-    colorWipe(strip.Color(0, 0, 255), 0); // Blue
+    //colorWipe(strip.Color(0, 0, 255), 0); // Blue
   }
 }
 
@@ -74,6 +63,27 @@ void colorWipe(uint32_t c, uint8_t wait) {
     strip.setPixelColor(i, c);
     strip.show();
     delay(wait);
+  }
+}
+
+void setSection(int start, int finish, int Nred, int Ngreen, int Nblue) {
+  uint32_t c = strip.getPixelColor(start);
+  uint8_t  redCur = (c >> 16) & 0xFF;
+  uint8_t  greenCur = (c >>  8) & 0xFF;
+  uint8_t  blueCur = c & 0xFF;
+  uint8_t redNew = Nred;
+  uint8_t greenNew = Ngreen;
+  uint8_t blueNew = Nblue;
+  for (int i = 1; i < TotalSteps; i++)
+  {
+    uint8_t red = (((redCur * (TotalSteps - i)) + (redNew * i)) / TotalSteps);
+    uint8_t green = (((greenCur * (TotalSteps - i)) + (greenNew * i)) / TotalSteps);
+    uint8_t blue = (((blueCur * (TotalSteps - i)) + (blueNew * i)) / TotalSteps);
+    for (int j = start; j < finish + 1; j++) {
+      strip.setPixelColor(j, red, green, blue);
+      strip.show();
+      delay(fadeRate);
+    }
   }
 }
 
