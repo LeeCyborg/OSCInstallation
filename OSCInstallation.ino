@@ -3,8 +3,10 @@
 #include <Adafruit_NeoPixel.h>
 #include <avr/power.h>
 #define PIN 6
-#define	uchar	unsigned char
-#define	uint	unsigned int
+#define  uchar unsigned char
+#define uint  unsigned int
+int TotalSteps = 10;
+int fadeRate = 10;
 int currTag;
 uchar fifobytes;
 uchar fifoValue;
@@ -41,7 +43,7 @@ void loop()
     uint tagType = str[0] << 8;
   }
 
-  myRFID.AddicoreRFID_Halt();	
+  myRFID.AddicoreRFID_Halt(); 
   if (int(currTag) == 233) { // If the tag is this
     //colorWipe(strip.Color(255, 0, 0), 5); // Red
 
@@ -86,4 +88,3 @@ void setSection(int start, int finish, int Nred, int Ngreen, int Nblue) {
     }
   }
 }
-
