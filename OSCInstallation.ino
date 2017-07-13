@@ -1,27 +1,38 @@
+// Example sketch to read the ID from an Addicore 13.56MHz RFID tag
+// as found in the RFID AddiKit found at:
+// http://www.addicore.com/RFID-AddiKit-with-RC522-MIFARE-Module-RFID-Cards-p/126.htm
+
 #include <AddicoreRFID.h>
 #include <SPI.h>
-#include <Adafruit_NeoPixel.h>
-#include <avr/power.h>
-#define PIN 6
+
 #define	uchar	unsigned char
 #define	uint	unsigned int
-int currTag;
+
 uchar fifobytes;
 uchar fifoValue;
-AddicoreRFID myRFID;
+
+AddicoreRFID myRFID; // create AddicoreRFID object to control the RFID module
+
+/////////////////////////////////////////////////////////////////////
+//set the pins
+/////////////////////////////////////////////////////////////////////
 const int chipSelectPin = 10;
 const int NRSTPD = 5;
+
+//Maximum length of the array
 #define MAX_LEN 16
-Adafruit_NeoPixel strip = Adafruit_NeoPixel(300, PIN, NEO_GRB + NEO_KHZ800);
+
 void setup() {
-  Serial.begin(9600);
+  Serial.begin(9600);                        // RFID reader SOUT pin connected to Serial RX pin at 9600bps
+
+  // start the SPI library:
   SPI.begin();
-  strip.begin();
-  strip.show(); 
-  pinMode(chipSelectPin, OUTPUT);             
-  digitalWrite(chipSelectPin, LOW);        
-  pinMode(NRSTPD, OUTPUT);                   
+
+  pinMode(chipSelectPin, OUTPUT);             // Set digital pin 10 as OUTPUT to connect it to the RFID /ENABLE pin
+  digitalWrite(chipSelectPin, LOW);         // Activate the RFID reader
+  pinMode(NRSTPD, OUTPUT);                    // Set digital pin 10 , Not Reset and Power-down
   digitalWrite(NRSTPD, HIGH);
+
   myRFID.AddicoreRFID_Init();
 }
 
@@ -31,59 +42,36 @@ void loop()
   uchar status;
   uchar str[MAX_LEN];
   uchar RC_size;
-  uchar blockAddr;
+  uchar blockAddr;	//Selection operation block address 0 to 63
   String mynum = "";
+
   str[1] = 0x4400;
+  //Find tags, return tag type
   status = myRFID.AddicoreRFID_Request(PICC_REQIDL, str);
   if (status == MI_OK)
-  {
     Serial.println("RFID tag detected");
-    uint tagType = str[0] << 8;
-  }
 
-  myRFID.AddicoreRFID_Halt();	
-  if (int(currTag) == 233) { // If the tag is this
-    //colorWipe(strip.Color(255, 0, 0), 5); // Red
-
-    // There are 300 LEDs, starting at 0
-    setSection(0, 200, 255, 0, 0); // Set 0 to 200 RED
-    setSection(201, 299,0, 255, 0); // Set the rest GREEN
-    
-  } // End each student code
-  if (int(currTag) == 234) {
-    //colorWipe(strip.Color(0, 255, 0), 0); // Green
-  }
-  if (int(currTag) == 246) {
-    //colorWipe(strip.Color(0, 0, 255), 0); // Blue
-  }
-}
-
-void colorWipe(uint32_t c, uint8_t wait) {
-  for (uint16_t i = 0; i < strip.numPixels(); i++) {
-    strip.setPixelColor(i, c);
-    strip.show();
-    delay(wait);
-  }
-}
-
-void setSection(int start, int finish, int Nred, int Ngreen, int Nblue) {
-  uint32_t c = strip.getPixelColor(start);
-  uint8_t  redCur = (c >> 16) & 0xFF;
-  uint8_t  greenCur = (c >>  8) & 0xFF;
-  uint8_t  blueCur = c & 0xFF;
-  uint8_t redNew = Nred;
-  uint8_t greenNew = Ngreen;
-  uint8_t blueNew = Nblue;
-  for (int i = 1; i < TotalSteps; i++)
+  //Anti-collision, return tag serial number 4 bytes
+  status = myRFID.AddicoreRFID_Anticoll(str);
+  if (status == MI_OK)
   {
-    uint8_t red = (((redCur * (TotalSteps - i)) + (redNew * i)) / TotalSteps);
-    uint8_t green = (((greenCur * (TotalSteps - i)) + (greenNew * i)) / TotalSteps);
-    uint8_t blue = (((blueCur * (TotalSteps - i)) + (blueNew * i)) / TotalSteps);
-    for (int j = start; j < finish + 1; j++) {
-      strip.setPixelColor(j, red, green, blue);
-      strip.show();
-      delay(fadeRate);
-    }
-  }
-}
+    checksum1 = str[0] ^ str[1] ^ str[2] ^ str[3];
+    Serial.print("The tag's number is:\t");
+    Serial.print(str[0]);
+    Serial.print(" , ");
+    Serial.print(str[1]);
+    Serial.print(" , ");
+    Serial.print(str[2]);
+    Serial.print(" , ");
+    Serial.println(str[3]);
 
+    Serial.print("Read Checksum:\t\t");
+    Serial.println(str[4]);
+    Serial.print("Calculated Checksum:\t");
+    Serial.println(checksum1);
+    Serial.println();
+    delay(1000);
+  }
+  myRFID.AddicoreRFID_Halt();		   //Command tag into hibernation
+
+}
