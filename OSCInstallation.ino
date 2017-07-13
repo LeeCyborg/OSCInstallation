@@ -22,6 +22,10 @@ const int NRSTPD = 5;
 //Maximum length of the array
 #define MAX_LEN 16
 
+int currTag;
+
+uchar blue[] = {96 , 132 , 56 , 82}; //Example of a tag
+
 void setup() {
   Serial.begin(9600);                        // RFID reader SOUT pin connected to Serial RX pin at 9600bps
 
@@ -52,6 +56,7 @@ void loop()
     Serial.println("RFID tag detected");
 
   //Anti-collision, return tag serial number 4 bytes
+  //Saves tag number in str[]
   status = myRFID.AddicoreRFID_Anticoll(str);
   if (status == MI_OK)
   {
@@ -70,8 +75,16 @@ void loop()
     Serial.print("Calculated Checksum:\t");
     Serial.println(checksum1);
     Serial.println();
-    delay(1000);
   }
   myRFID.AddicoreRFID_Halt();		   //Command tag into hibernation
+  //Compare str[] (4 bytes) to any 4 byte uchar that you already know of
+  //Prints true on match to blue fob from dme
+  if(compareTag(str, blue))
+    Serial.println("true");
+}
 
+bool compareTag(uchar from[], uchar to[]){
+  if(from[0] == to[0] && from[1] == to[1] && from[2] == to[2] && from[3] == to[3])
+    return true;
+  return false;
 }
