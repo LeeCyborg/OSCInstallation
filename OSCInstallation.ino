@@ -82,7 +82,7 @@ void loop()
   if(compareTag(str, blue))
     Serial.println("true");
 }
-
+//pretty self explanatory, cards should be saved in a uchar array like the variable 'blue' above
 bool compareTag(uchar from[], uchar to[]){
   if(from[0] == to[0] && from[1] == to[1] && from[2] == to[2] && from[3] == to[3])
     return true;
