@@ -10,7 +10,9 @@
 #endif
 #define PIN 6
 Adafruit_NeoPixel strip = Adafruit_NeoPixel(60, PIN, NEO_GRB + NEO_KHZ800);
-
+int fadeRate = 10;
+int MaxBrightness = 255;
+int TotalSteps = 15;
 #define  uchar unsigned char
 #define uint  unsigned int
 
@@ -34,20 +36,7 @@ int currTag;
 int vars[] = { 216, 228, 227, 203, 229, 238, 215,
 248, 239, 257, 228, 281, 238, 237, 248, 260, 204,
 195, 206, 205 };
-//int oil = 228;
-//int lang = 216;
-//int immg = 227;
-//int beaver = 203;
-//int syrup = 229;
-//int coffee = 238;
-//int sport = 215;
-//int ethnic = 248;
-//int donut = 239;
-//int lights = 257;
-//int rural
-//int immg
-//int festival
-//int 
+
 
 void setup() {
   Serial.begin(9600);                        // RFID reader SOUT pin connected to Serial RX pin at 9600bps
@@ -88,10 +77,12 @@ void loop()
   }
   myRFID.AddicoreRFID_Halt();      //Command tag into hibernation
   if (add == vars[0]) {
-    colorWipe(strip.Color(255, 0, 0), 50); // Red
+    setSection(0, 2, 255, 0, 0);
+    setSection(3, 5, 255, 0, 255);
   }
   if (add == vars[1]) {
-    colorWipe(strip.Color(255, 255, 0), 50); // Red
+     setSection(0, 2, 0, 255, 0);
+    setSection(3, 5,0, 0, 255);
   }
 
 }
@@ -109,4 +100,23 @@ void colorWipe(uint32_t c, uint8_t wait) {
     delay(wait);
   }
 }
-
+void setSection(int start, int finish, int Nred, int Ngreen, int Nblue) {
+  uint32_t c = strip.getPixelColor(start);
+  uint8_t  redCur = (c >> 16) & 0xFF;
+  uint8_t  greenCur = (c >>  8) & 0xFF;
+  uint8_t  blueCur = c & 0xFF;
+  uint8_t redNew = Nred;
+  uint8_t greenNew = Ngreen;
+  uint8_t blueNew = Nblue;
+  for (int i = 1; i < TotalSteps; i++)
+  {
+    uint8_t red = (((redCur * (TotalSteps - i)) + (redNew * i)) / TotalSteps);
+    uint8_t green = (((greenCur * (TotalSteps - i)) + (greenNew * i)) / TotalSteps);
+    uint8_t blue = (((blueCur * (TotalSteps - i)) + (blueNew * i)) / TotalSteps);
+    for (int j = start; j < finish + 1; j++) {
+      strip.setPixelColor(j, red, green, blue);
+      strip.show();
+      delay(fadeRate);
+    }
+  }
+}
