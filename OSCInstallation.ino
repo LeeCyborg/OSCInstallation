@@ -76,15 +76,31 @@ void loop()
     myRFID.AddicoreRFID_Halt();
   }
   myRFID.AddicoreRFID_Halt();      //Command tag into hibernation
-  if (add == vars[0]) {
-    setSection(0, 2, 255, 0, 0);
-    setSection(3, 5, 255, 0, 255);
+  if (add == vars[0]) { // english vs french
+    setSection(0, 70, 255, 0, 0);// eng
+    setSection(71, 100, 255, 0, 255);//fr
+    setSection(101, 149, 255, 0, 255);// other
   }
-  if (add == vars[1]) {
-     setSection(0, 2, 0, 255, 0);
-    setSection(3, 5,0, 0, 255);
+  if (add == vars[1]) { // oil
+     setSection(0, 8, 255, 0, 0);// 6% us
+    setSection(7, 149,0, 0, 0); // everyone else
   }
-
+  if (add == vars[2]) { // immigrants
+     setSection(0, 40, 0, 255, 0);// 21%
+    setSection(41, 149,0, 0, 0); // everyone else
+  }
+  if (add == vars[3]) { // beaver
+     setSection(0, 20, 0, 255, 0);// 14% beavers
+    setSection(41, 149,0, 0, 0); // everyone else
+  }
+  if (add == vars[4]) { // syrup
+     setSection(0, 90, 255, 150, 30);// 80% of the world
+    setSection(91, 149,0, 0, 0); // everyone else
+  }
+  if (add == vars[5]) { // coffee
+     setSection(0, 70, 255, 200, 0);// 68% of the world
+    setSection(71, 149,0, 0, 0); // everyone else
+  }
 }
 //pretty self explanatory, cards should be saved in a uchar array like the variable 'blue' above
 bool compareTag(uchar from[], uchar to[]) {
