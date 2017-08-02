@@ -1,9 +1,32 @@
-// Example sketch to read the ID from an Addicore 13.56MHz RFID tag
-// as found in the RFID AddiKit found at:
-// http://www.addicore.com/RFID-AddiKit-with-RC522-MIFARE-Module-RFID-Cards-p/126.htm
+/**************************************************************************/
+/*!
+    @file     iso14443a_uid.pde
+    @author   Adafruit Industries
+  @license  BSD (see license.txt)
 
-#include <AddicoreRFID.h>
+    This example will attempt to connect to an ISO14443A
+    card or tag and retrieve some basic information about it
+    that can be used to determine what type of card it is.
+
+    Note that you need the baud rate to be 115200 because we need to print
+  out the data and read from the card at the same time!
+
+  This is an example sketch for the Adafruit PN532 NFC/RFID breakout boards
+  This library works with the Adafruit NFC breakout
+  ----> https://www.adafruit.com/products/364
+
+  Check out the links above for our tutorials and wiring diagrams
+  These chips use SPI or I2C to communicate.
+
+  Adafruit invests time and resources providing this open source code,
+  please support Adafruit and open-source hardware by purchasing
+  products from Adafruit!
+
+*/
+/**************************************************************************/
+#include <Wire.h>
 #include <SPI.h>
+#include <Adafruit_PN532.h>
 #include <Adafruit_NeoPixel.h>
 #ifdef __AVR__
 #include <avr/power.h>
@@ -13,107 +36,104 @@ Adafruit_NeoPixel strip = Adafruit_NeoPixel(60, PIN, NEO_GRB + NEO_KHZ800);
 int fadeRate = 10;
 int MaxBrightness = 255;
 int TotalSteps = 15;
-#define  uchar unsigned char
-#define uint  unsigned int
+// If using the breakout with SPI, define the pins for SPI communication.
+#define PN532_SCK  (2)
+#define PN532_MOSI (3)
+#define PN532_SS   (4)
+#define PN532_MISO (5)
 
-uchar fifobytes;
-uchar fifoValue;
+// If using the breakout or shield with I2C, define just the pins connected
+// to the IRQ and reset lines.  Use the values below (2, 3) for the shield!
+#define PN532_IRQ   (2)
+#define PN532_RESET (3)  // Not connected by default on the NFC Shield
 int add;
+// Uncomment just _one_ line below depending on how your breakout or shield
+// is connected to the Arduino:
 
-AddicoreRFID myRFID; // create AddicoreRFID object to control the RFID module
+// Use this line for a breakout with a SPI connection:
+Adafruit_PN532 nfc(PN532_IRQ, PN532_RESET);
 
-/////////////////////////////////////////////////////////////////////
-//set the pins
-/////////////////////////////////////////////////////////////////////
-const int chipSelectPin = 10;
-const int NRSTPD = 5;
+// Use this line for a breakout with a hardware SPI connection.  Note that
+// the PN532 SCK, MOSI, and MISO pins need to be connected to the Arduino's
+// hardware SPI SCK, MOSI, and MISO pins.  On an Arduino Uno these are
+// SCK = 13, MOSI = 11, MISO = 12.  The SS line can be any digital IO pin.
+//Adafruit_PN532 nfc(PN532_SS);
 
-//Maximum length of the array
-#define MAX_LEN 16
+// Or use this line for a breakout or shield with an I2C connection:
+//Adafruit_PN532 nfc(PN532_IRQ, PN532_RESET);
 
-int currTag;
+int vars[] = { 591, 680, 585, 547, 586, 579};
 
-int vars[] = { 216, 228, 227, 203, 229, 238, 215,
-248, 239, 257, 228, 281, 238, 237, 248, 260, 204,
-195, 206, 205 };
+void setup(void) {
+  Serial.begin(115200);
+  Serial.println("Hello!");
 
+  nfc.begin();
 
-void setup() {
-  Serial.begin(9600);                        // RFID reader SOUT pin connected to Serial RX pin at 9600bps
+  uint32_t versiondata = nfc.getFirmwareVersion();
+  if (! versiondata) {
+    Serial.print("Didn't find PN53x board");
+    while (1); // halt
+  }
 
-  // start the SPI library:
-  SPI.begin();
+  // Got ok data, print it out!
+  Serial.print("Found chip PN5"); Serial.println((versiondata >> 24) & 0xFF, HEX);
+  Serial.print("Firmware ver. "); Serial.print((versiondata >> 16) & 0xFF, DEC);
+  Serial.print('.'); Serial.println((versiondata >> 8) & 0xFF, DEC);
 
-  strip.begin();
-  strip.show(); // Initialize all pixels to 'off'
-  pinMode(chipSelectPin, OUTPUT);             // Set digital pin 10 as OUTPUT to connect it to the RFID /ENABLE pin
-  digitalWrite(chipSelectPin, LOW);         // Activate the RFID reader
-  pinMode(NRSTPD, OUTPUT);                    // Set digital pin 10 , Not Reset and Power-down
-  digitalWrite(NRSTPD, HIGH);
+  // Set the max number of retry attempts to read from a card
+  // This prevents us from waiting forever for a card, which is
+  // the default behaviour of the PN532.
+  nfc.setPassiveActivationRetries(0xFF);
 
-  myRFID.AddicoreRFID_Init();
-  Serial.println("finished init");
+  // configure board to read RFID tags
+  nfc.SAMConfig();
+
+  Serial.println("Waiting for an ISO14443A card");
 }
 
-void loop()
-{
-  uchar i, tmp, checksum1;
-  uchar status;
-  uchar str[MAX_LEN];
-  uchar RC_size;
-  uchar blockAddr;  //Selection operation block address 0 to 63
-
-  str[1] = 0x4400;
-  //Find tags, return tag type
-  status = myRFID.AddicoreRFID_Request(PICC_REQIDL, str);
-  if (status == MI_OK)
-    Serial.println("RFID tag detected");
-  status = myRFID.AddicoreRFID_Anticoll(str);
-  if (status == MI_OK)
-  {
-    add = str[0] + str[1] + str[2] + str[3];
+void loop(void) {
+  boolean success;
+  uint8_t uid[] = { 0, 0, 0, 0, 0, 0, 0 };  // Buffer to store the returned UID
+  uint8_t uidLength;        // Length of the UID (4 or 7 bytes depending on ISO14443A card type)
+  success = nfc.readPassiveTargetID(PN532_MIFARE_ISO14443A, &uid[0], &uidLength);
+  if (success) {
+    Serial.println("Found a card!");
+    add = 0;
+    for (uint8_t i = 0; i < uidLength; i++)
+    {
+      add = add+ int(uid[i]);
+    }
     Serial.println(add);
-    myRFID.AddicoreRFID_Halt();
-  }
-  myRFID.AddicoreRFID_Halt();      //Command tag into hibernation
-  if (add == vars[0]) { // english vs french
-    setSection(0, 70, 255, 0, 0);// eng
-    setSection(71, 100, 255, 0, 255);//fr
-    setSection(101, 149, 255, 0, 255);// other
-  }
-  if (add == vars[1]) { // oil
-     setSection(0, 8, 255, 0, 0);// 6% us
-    setSection(7, 149,0, 0, 0); // everyone else
-  }
-  if (add == vars[2]) { // immigrants
-     setSection(0, 40, 0, 255, 0);// 21%
-    setSection(41, 149,0, 0, 0); // everyone else
-  }
-  if (add == vars[3]) { // beaver
-     setSection(0, 20, 0, 255, 0);// 14% beavers
-    setSection(41, 149,0, 0, 0); // everyone else
-  }
-  if (add == vars[4]) { // syrup
-     setSection(0, 90, 255, 150, 30);// 80% of the world
-    setSection(91, 149,0, 0, 0); // everyone else
-  }
-  if (add == vars[5]) { // coffee
-     setSection(0, 70, 255, 200, 0);// 68% of the world
-    setSection(71, 149,0, 0, 0); // everyone else
-  }
-}
-//pretty self explanatory, cards should be saved in a uchar array like the variable 'blue' above
-bool compareTag(uchar from[], uchar to[]) {
-  if (from[0] == to[0] && from[1] == to[1] && from[2] == to[2] && from[3] == to[3])
-    return true;
-  return false;
-}
+    if (add == vars[0]) { // forests
+          setSection(0, 40, 0, 200, 0);// eng
+          setSection(41, 59, 255, 0, 255);//fr
 
-void colorWipe(uint32_t c, uint8_t wait) {
-  for (uint16_t i = 0; i < strip.numPixels(); i++) {
-    strip.setPixelColor(i, c);
-    strip.show();
-    delay(wait);
+    }
+    if (add == vars[1]) { // starbucks vs tims
+      setSection(0,50, 255, 0, 0);// tims
+          setSection(51, 59,0, 255, 0); // star
+    }
+    if (add == vars[2]) { // money
+       setSection(0, 15, 0, 255, 0);// $$$
+          setSection(16, 59,0, 0, 0); // everyone else
+    }
+    if (add == vars[3]) { // urban vs rural
+      setSection(0, 20, 0, 255, 0);// 14% beavers
+          setSection(41, 59,0, 0, 0); // everyone else
+    }
+    if (add == vars[4]) { // indig
+          setSection(0, 10, 255, 150, 30);// 
+          setSection(11, 59,0, 0, 0); // everyone else
+    }
+    if (add == vars[5]) { // lights
+//           setSection(0, 10, 255, 0, 255);// 68% of the world
+//          setSection(11, 21,0, 0, 0); // everyone else
+//          setSection(22, 35, 255, 200, 0);// 68% of the world
+//          setSection(36, 59,0, 0, 0); // everyone else
+    }
+    // Wait 1 second before continuing
+    delay(1000);
   }
 }
 void setSection(int start, int finish, int Nred, int Ngreen, int Nblue) {
